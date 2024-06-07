@@ -21,14 +21,17 @@ async def add_user_to_bot(*, user_id, username):
 async def select_query(query: str):
     loop = asyncio.get_event_loop()
     interactor = DBInteractor(db_password=getenv("DB_PASSWORD"))
-    return await loop.run_in_executor(None, interactor.select, query)
+    logging.info(f"Executing {query}")
+    result = await loop.run_in_executor(None, interactor.select, query)
+    logging.info(f"Query result: {result}")
+    return result
 
 
-async def insert(query: str):
+async def insert(query: str, return_last=False):
     loop = asyncio.get_event_loop()
     interactor = DBInteractor(db_password=getenv("DB_PASSWORD"))
     try:
-         res = await loop.run_in_executor(None, interactor.insert, query)
+         res = await loop.run_in_executor(None, interactor.insert, query, return_last)
          logging.info("Insertion successfully completed!")
          return res
 

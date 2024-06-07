@@ -37,6 +37,16 @@ async def get_to_main_menu(message: Message, state: FSMContext):
     await message.answer(text=strings.BotMenus.main_menu, reply_markup=markup)
 
 
+async def create_user_challenge(title: str, description: str, user_id: int):
+    query = queries.insert_new_user_challenge.format(
+        owner_id=user_id,
+        title=title,
+        description=description,
+        creation_date=datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    )
+    return await insert(query, return_last=True)
+
+
 @router.message(
     F.text.capitalize() == MMBNames.new_challenge,
     StateFilter(None),
@@ -45,7 +55,7 @@ async def get_to_main_menu(message: Message, state: FSMContext):
 async def create_new_challenge_handler(message: Message, state: FSMContext):
     await message.reply(text=strings.challenge_creation_menu, reply_markup=aiogram.types.ReplyKeyboardRemove())
     markup = ExistingOrNewChallengeKeyboard().markup()
-    await message.answer(text=strings.choose_action, reply_markup=markup)
+    await message.answer(text=strings.choose_action, reply_markup=markup, protect_content=True)
     await state.set_state(ChallengeCreationStates.choosing_challenge)
 
 
@@ -55,15 +65,31 @@ async def create_new_challenge_handler(message: Message, state: FSMContext):
     PrivateMessagesScope()
 )
 async def create_default_challenge_handler(callback: aiogram.types.CallbackQuery):
-    default_challenge_list = await select_query(queries.select_challenges)
-    markup = SelectChallengeKeyboard(callback.from_user.id, default_challenge_list).markup()
+    total_challenges = await select_query(queries.select_total_challenges.format(owner_id=callback.from_user.id))
+    challenge_list = await select_query(queries.select_challenges.format(user_id=callback.from_user.id, offset=0))
+
+    markup = SelectChallengeKeyboard(callback.from_user.id, challenge_list, total_challenges[0][0]).markup()
     await callback.message.edit_text(text=f'{JoinChallengePhrases.just_joined}\n{JoinChallengePhrases.available_challenges}')
     await callback.message.edit_reply_markup(reply_markup=markup)
 
 
 @router.callback_query(
-    ButtonPressedCBData.filter(),
+    LoadNextChallengePageCB.filter(),
     ChallengeCreationStates.choosing_challenge,
+    PrivateMessagesScope()
+)
+async def load_next_page_handler(callback: aiogram.types.CallbackQuery, callback_data: LoadNextChallengePageCB):
+    offset = callback_data.offset
+    total = callback_data.total
+    button_list = await select_query(queries.select_challenges.format(user_id=callback.from_user.id,
+                                                                      offset=offset))
+    markup = SelectChallengeKeyboard(callback.from_user.id, button_list, total).markup(offset=offset)
+    await callback.message.edit_reply_markup(reply_markup=markup)
+
+
+@router.callback_query(
+    ButtonPressedCBData.filter(),
+    ChallengeCreationStates.choosing_challenge
 )
 async def challenge_chosen_handler(callback: CallbackQuery, callback_data: ButtonPressedCBData, state: FSMContext):
     challenge_id, user_id = callback_data.button_title, callback_data.user_id
@@ -81,11 +107,19 @@ async def challenge_chosen_handler(callback: CallbackQuery, callback_data: Butto
 
 @router.callback_query(
     ChallengeDurationCBData.filter(),
-    ChallengeCreationStates.choosing_challenge_length
+    ChallengeCreationStates.choosing_challenge_length,
+    PrivateMessagesScope()
 )
 async def add_challenge_to_the_database(callback: CallbackQuery, callback_data: ChallengeDurationCBData, state: FSMContext):
     state_data = await state.get_data()
-    challenge_id, user_id = state_data.pop("challenge_id"), state_data.pop("user_id")
+    challenge_id, user_id = state_data.get("challenge_id"), state_data.get("user_id")
+
+    if challenge_id is None or user_id is None:
+        title, desc = state_data.pop("title"), state_data.pop("desc")
+        user_id = callback.from_user.id
+        challenge_id = await create_user_challenge(title, desc, user_id)
+        print(challenge_id)
+
     weeks = callback_data.weeks
     current_time = datetime.datetime.now()
     challenge_end_time = current_time + datetime.timedelta(weeks=weeks)

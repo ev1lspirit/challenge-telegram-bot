@@ -37,11 +37,14 @@ class DBInteractor(SingletonDBInteractor):
             cursor.execute(query)
             return cursor.fetchall()
 
-    def insert(self, query: str):
+    def insert(self, query: str, return_last=False):
+        last = True
         with pg.connect(host=self.host, port=self.port,
                         dbname=self.db_name, user=self.db_user,
                         password=self.db_password) as conn:
             cursor = conn.cursor()
             cursor.execute(query)
             conn.commit()
-        return True
+            if return_last:
+                last = cursor.fetchone()[0]
+        return last

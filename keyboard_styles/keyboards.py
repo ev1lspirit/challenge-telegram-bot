@@ -111,7 +111,8 @@ class GetBackKeyboard(BaseKeyboard):
 
 class SelectChallengeKeyboard(InlineTypeKeyboard):
 
-    def __init__(self, user_id: int, button_text_list: list[tuple[int, str]]):
+    def __init__(self, user_id: int, button_text_list: list[tuple[int, str]], total: int):
+        self.total = total
         self.user_id = user_id
         self.button_text_list = button_text_list
         super().__init__()
@@ -126,13 +127,31 @@ class SelectChallengeKeyboard(InlineTypeKeyboard):
         assert value, "Button list cannot be empty"
         self._button_text_list = value
 
-    def markup(self, *args) -> InlineKeyboardMarkup:
+    def markup(self, offset=0) -> InlineKeyboardMarkup:
         for title in self.button_text_list:
             data = ButtonPressedCBData(button_title=title[0], user_id=self.user_id)
             btn = InlineKeyboardButton(text=title[1], callback_data=data.pack())
             self.builder.row(btn, width=1)
-        btn = InlineKeyboardButton(text=strings.back_to_main_menu, callback_data=ExitChallengeSettingCB().pack())
-        self.builder.row(btn, width=1)
+        pages_count = InlineKeyboardButton(text=f"Страница {offset // 5 + 1}/{self.total // 5 + 1}",
+                                           callback_data="some_data")
+
+        next_action_button = None
+        back_button = None
+
+        forward_condition = not offset or self.total // offset > 1
+        backward_condition = offset > 0
+        if forward_condition:
+            next_action_button = InlineKeyboardButton(text="Следующая страница",
+                                                      callback_data=LoadNextChallengePageCB(offset=offset + 5,
+                                                                                            total=self.total).pack())
+        if backward_condition:
+            back_button = InlineKeyboardButton(text="Назад", callback_data="ff")
+
+        to_create = list(filter(lambda btn: btn is not None, [next_action_button, back_button]))
+        print(to_create)
+        self.builder.row(pages_count, *to_create, width=1+len(to_create))
+        exit_creation = InlineKeyboardButton(text=strings.back_to_main_menu, callback_data=ExitChallengeSettingCB().pack())
+        self.builder.row(exit_creation, width=1)
         return self.builder.as_markup()
 
 
