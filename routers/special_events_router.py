@@ -22,7 +22,6 @@ async def handle_adding_bot_to_group(event: ChatMemberUpdated):
     markup = keyboard.markup()
     reply_phrase = SupergroupStartPhrases.basic_template
     await event.answer(
-        text=reply_phrase,
-        reply_markup=markup
+        text=reply_phrase
     )
 

@@ -1,15 +1,11 @@
-import logging
-
-from aiogram import Router, F
+from aiogram import Router
 from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.types import Message
 
 from db import add_user_to_bot
 from keyboard_styles.keyboards import MainMenuKeyboard
 from strings import StartPhrases
-from keyboard_styles import StartKeyboard
 from validators import is_user_registered
-from .filters import PrivateMessagesScope
 
 __all__ = "router"
 
@@ -18,7 +14,7 @@ router = Router(name="StartRouter")
 
 @router.message(
     StateFilter(None),
-    CommandStart(),
+    CommandStart()
 )
 async def start_message_handler(message: Message):
     if not is_user_registered(message.from_user.id, message.from_user.username):

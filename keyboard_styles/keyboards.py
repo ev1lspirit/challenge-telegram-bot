@@ -12,7 +12,8 @@ import abc
 import typing as tp
 from strings import (
     ExistingOrNewChallengeButtonNames as EoNButtonNames,
-    MainMenuButtonNames as MMBNames
+    MainMenuButtonNames as MMBNames,
+    PaginationButtonMessages
 )
 
 
@@ -141,15 +142,19 @@ class SelectChallengeKeyboard(InlineTypeKeyboard):
         forward_condition = not offset or self.total // offset > 1
         backward_condition = offset > 0
         if forward_condition:
-            next_action_button = InlineKeyboardButton(text="Следующая страница",
+            next_action_button = InlineKeyboardButton(text=PaginationButtonMessages.forward,
                                                       callback_data=LoadNextChallengePageCB(offset=offset + 5,
                                                                                             total=self.total).pack())
         if backward_condition:
-            back_button = InlineKeyboardButton(text="Назад", callback_data="ff")
+            back_button = InlineKeyboardButton(text=PaginationButtonMessages.back, callback_data=LoadNextChallengePageCB(offset=offset - 5,
+                                                                                                   total=self.total).pack())
 
-        to_create = list(filter(lambda btn: btn is not None, [next_action_button, back_button]))
-        print(to_create)
-        self.builder.row(pages_count, *to_create, width=1+len(to_create))
+        to_create = list(filter(lambda btn: btn is not None, [back_button, next_action_button]))
+        if len(to_create) == 2:
+            self.builder.row(to_create[0], pages_count, to_create[1], width=3)
+        else:
+            self.builder.row(pages_count, to_create[0], width=2)
+
         exit_creation = InlineKeyboardButton(text=strings.back_to_main_menu, callback_data=ExitChallengeSettingCB().pack())
         self.builder.row(exit_creation, width=1)
         return self.builder.as_markup()

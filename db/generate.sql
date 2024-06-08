@@ -31,10 +31,10 @@ CREATE TABLE ActiveChallenge (
 );
 
 CREATE TABLE ChallengeParticipant (
-    participant_id BIGINT REFERENCES Participant(user_id),
-    challenge_id INTEGER REFERENCES Challenge(challenge_id),
-    is_kicked BOOLEAN NOT NULL,
-    PRIMARY KEY (participant_id, challenge_id)
+    user_id BIGINT REFERENCES Participant(user_id),
+    challenge_id INTEGER REFERENCES ActiveChallenge(active_challenge_id),
+    is_kicked BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (user_id, challenge_id)
 );
 
 INSERT INTO UserCreatedChallenge (owner_id, title, description, creation_date) VALUES (0, 'Потребление овощей и фруктов', 'Челлендж включает в себя потребление различных овощей и фруктов каждый день в размере не менее 500 г.', current_timestamp);

@@ -4,9 +4,6 @@ import re
 from aiogram.filters import Filter
 from aiogram.types import Message, CallbackQuery
 import asyncio
-
-import queries
-from callback_data import ButtonPressedCBData
 from db import select_query
 from validators import is_user_registered
 from bot_types import ChatTypes

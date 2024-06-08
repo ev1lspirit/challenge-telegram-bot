@@ -1,33 +1,28 @@
 import datetime
-import logging
+from middlewares import RequireRegistrationMiddleware
 import aiogram.types
 from aiogram import Router, F
-from aiogram.filters import Command, StateFilter
-from aiogram.methods import AnswerCallbackQuery
+from aiogram.filters import StateFilter
 from aiogram.types import Message, CallbackQuery
 import queries
 import strings
 from callback_data import *
-from commands import StartCallbackQueryCommands as StartCQC
-from keyboard_styles.keyboards import (GetBackKeyboard, StartKeyboard, ExistingOrNewChallengeKeyboard,
+from keyboard_styles.keyboards import (ExistingOrNewChallengeKeyboard,
                                        MainMenuKeyboard)
-from .filters import RequireRegistration, PrivateMessagesScope
+from filters import PrivateMessagesScope
 from db import select_query, insert
 from strings import (
     JoinChallengePhrases,
     ChallengeDurationPhrases,
-    StartPhrases,
-    ExistingOrNewChallengeButtonNames as EoNButtonNames,
     MainMenuButtonNames as MMBNames,
-    InterruptChallengeCreationStrings as ICCStrings,
     InterruptionMessages
 )
 from keyboard_styles import ChallengeDurationKeyboard, SelectChallengeKeyboard
 from aiogram.fsm.context import FSMContext
 from fsm_states import ChallengeCreationStates
-from .filters.authfilters import LessThanTenChallengesFilter
 
 router = Router(name='JoinChallengeRouter')
+router.message.middleware(RequireRegistrationMiddleware())
 
 
 async def get_to_main_menu(message: Message, state: FSMContext):
@@ -35,16 +30,6 @@ async def get_to_main_menu(message: Message, state: FSMContext):
     markup = MainMenuKeyboard().markup()
     markup.resize_keyboard = True
     await message.answer(text=strings.BotMenus.main_menu, reply_markup=markup)
-
-
-async def create_user_challenge(title: str, description: str, user_id: int):
-    query = queries.insert_new_user_challenge.format(
-        owner_id=user_id,
-        title=title,
-        description=description,
-        creation_date=datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    )
-    return await insert(query, return_last=True)
 
 
 @router.message(
@@ -75,6 +60,11 @@ async def create_default_challenge_handler(callback: aiogram.types.CallbackQuery
 
 @router.callback_query(
     LoadNextChallengePageCB.filter(),
+    ChallengeCreationStates.choosing_challenge,
+    PrivateMessagesScope()
+)
+@router.callback_query(
+    LoadPreviousChallengePageCB.filter(),
     ChallengeCreationStates.choosing_challenge,
     PrivateMessagesScope()
 )
@@ -117,15 +107,21 @@ async def add_challenge_to_the_database(callback: CallbackQuery, callback_data: 
     if challenge_id is None or user_id is None:
         title, desc = state_data.pop("title"), state_data.pop("desc")
         user_id = callback.from_user.id
-        challenge_id = await create_user_challenge(title, desc, user_id)
-        print(challenge_id)
+        query = queries.insert_new_user_challenge.format(
+            owner_id=user_id,
+            title=title,
+            description=desc,
+            creation_date=datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        )
+        challenge_id = await insert(query, return_last=True)
 
     weeks = callback_data.weeks
     current_time = datetime.datetime.now()
     challenge_end_time = current_time + datetime.timedelta(weeks=weeks)
     creation_time = current_time.strftime("%d/%m/%Y %H:%M:%S")
     end_time = challenge_end_time.strftime("%d/%m/%Y %H:%M:%S")
-    query = queries.insert_active_challenge.format(user_id=user_id,
+    print(challenge_id)
+    query = queries.insert_active_transaction.format(user_id=user_id,
                                                    challenge_id=challenge_id,
                                                    creation_date=creation_time,
                                                    end_date=end_time)

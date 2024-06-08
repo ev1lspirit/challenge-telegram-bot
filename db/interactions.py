@@ -33,6 +33,7 @@ async def insert(query: str, return_last=False):
     try:
          res = await loop.run_in_executor(None, interactor.insert, query, return_last)
          logging.info("Insertion successfully completed!")
+         logging.info(query)
          return res
 
     except Exception as exc:

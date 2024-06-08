@@ -1,16 +1,19 @@
 import datetime
+from dataclasses import dataclass
+from pprint import pprint
 
 import aiogram.types
 from aiogram.types import Message
-from aiogram import F, Router
+from aiogram import Router
 from aiogram.filters import Command, StateFilter
 
+import queries
 from callback_data import ShowMyChallengesCB
 from db import select_query
 from keyboard_styles import ProfileKeyboard
-from .filters import RequireRegistration, PrivateMessagesScope
-from strings import ShowProfileInfoPhrases
-
+from filters import RequireRegistration, PrivateMessagesScope
+from strings import ShowProfileInfoPhrases, ChallengeListTemplates, DatetimeEndings
+from utils import get_timedelta
 
 router = Router(name='ProfileRouter')
 
@@ -30,12 +33,37 @@ async def user_profile_handler(message: Message):
                         reply_markup=markup)
 
 
-@router.callback_query(
-    StateFilter(None),
-    ShowMyChallengesCB.filter(),
-    RequireRegistration(),
-    PrivateMessagesScope()
+@dataclass
+class UserChallenge:
+    title: str
+    description: str
+    owner_id: int
+    end_date: datetime.datetime
+
+
+@router.message(
+    Command('challenge')
 )
-async def show_list_of_challenges(callback: aiogram.types.CallbackQuery):
-    pass
+async def show_list_of_challenges(message: aiogram.types.CallbackQuery):
+    query = queries.select_challenges_query.format(user_id=message.from_user.id)
+    challenges = await select_query(query)
+    if not challenges:
+        return
+    challenges = list(map(lambda tup: UserChallenge(*tup), challenges))
+    owner_username = await select_query(queries.select_username_by_id.format(user_id=challenges[0].owner_id))
+
+    templates = []
+    for challenge in challenges:
+        templates.append(ChallengeListTemplates.template.format(
+            username=owner_username[0][0],
+            description=challenge.description,
+            challenge_title=challenge.title,
+            time_delta=get_timedelta(challenge.end_date)
+        ))
+
+    await message.answer(text="\n".join(templates))
+
+
+
+
 

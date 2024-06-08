@@ -12,7 +12,7 @@ class CreateUserOwnChallengeCB(CallbackData, prefix="o-chal"):
 class LoadNextChallengePageCB(CallbackData, prefix="ld-n"):
     offset: int
     total: int
-    
+
 
 class LoadPreviousChallengePageCB(CallbackData, prefix="ld-p"):
     offset: int

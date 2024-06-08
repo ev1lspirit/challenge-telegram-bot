@@ -1,13 +1,20 @@
 from dataclasses import dataclass
-import abc
+
+from aiogram.utils.formatting import as_list, as_key_value, as_marked_section, Text
+
 from emoji import emojize
-from typing import NamedTuple
 
 
 bot_typedefs = ("Ботослон", "Ботяра", "Слонобот")
 choose_action = "Выберите действие"
 challenge_creation_menu = f'{emojize(":desktop_computer:")} Меню создания челленджа'
-back_to_main_menu = "Выйти в главное меню"
+back_to_main_menu = emojize(':cross_mark:')
+
+
+@dataclass
+class PaginationButtonMessages:
+    back = f"{emojize(':backhand_index_pointing_left:')} Назад"
+    forward = f"Вперед {emojize(':backhand_index_pointing_right:')} "
 
 
 @dataclass
@@ -63,6 +70,25 @@ class ShowProfileInfoPhrases:
                       f'{emojize(":woman_frowning:")} ' + "Юзернейм: {username}\n"
                       f'{emojize(":calendar:")} ' + "Присоединился: {join_date}\n"
                       f'{emojize(":sports_medal:")} ' + "Репутация: {rep_points}")
+
+@dataclass
+class ChallengeListTemplates:
+    template = "".join((f"{emojize(':video_game:')} ", """{challenge_title}:
+    {description}
+    
+    %s Автор: @{username}
+    %s Челлендж закончится через {time_delta}
+    """ % (emojize(':writing_hand:'), emojize(':calendar:'))))
+
+
+@dataclass
+class DatetimeEndings:
+    template1 = "{weeks} {w_ending}, {days} {d_ending}, {hours} {h_ending}"
+    template2 = "{days} {d_ending} и {hours} {h_ending}"
+    template3 = "{hours} {h_ending}"
+    week = ("Неделю", "Недели", "Недель")
+    days = ("День", "Дня", "Дней")
+    hours = ("Час", "Часа", "Часов")
 
 
 @dataclass
