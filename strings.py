@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from aiogram.utils.formatting import as_list, as_key_value, as_marked_section, Text
+from aiogram.utils.formatting import as_list, as_key_value, as_marked_section, Text, Bold
 
 from emoji import emojize
 
@@ -41,6 +41,8 @@ class MainMenuButtonNames:
     new_challenge = "Создать новый челлендж"
     join_current = "Присоединиться к существующему челленджу"
     help_btn = "Помощь"
+    my_challenges = "Мои челленджи"
+    my_profile = "Мой профиль"
 
 
 @dataclass
@@ -52,6 +54,7 @@ class ExistingOrNewChallengeButtonNames:
 @dataclass
 class InterruptChallengeCreationStrings:
     back_to_menu = "Назад в главное меню"
+
 
 
 @dataclass
@@ -71,14 +74,24 @@ class ShowProfileInfoPhrases:
                       f'{emojize(":calendar:")} ' + "Присоединился: {join_date}\n"
                       f'{emojize(":sports_medal:")} ' + "Репутация: {rep_points}")
 
-@dataclass
+
 class ChallengeListTemplates:
-    template = "".join((f"{emojize(':video_game:')} ", """{challenge_title}:
-    {description}
-    
-    %s Автор: @{username}
-    %s Челлендж закончится через {time_delta}
-    """ % (emojize(':writing_hand:'), emojize(':calendar:'))))
+    __slots__ = "title", "description", "username", "timedelta"
+
+    def __init__(self, title: str, description: str, username: str, time_delta: str):
+        self.title = title
+        self.description = description
+        self.username = username
+        self.timedelta = time_delta
+
+    def toText(self):
+        return as_list(
+                Bold(f"{emojize(':pushpin:')} {self.title}"),
+                f"{self.description}",
+                as_key_value(f"   {emojize(':writing_hand:')} Автор", f"@{self.username}"),
+                as_key_value(f"   {emojize(':calendar:')} Челлендж закончится через", f"{self.timedelta}"),
+                "\n"
+        )
 
 
 @dataclass

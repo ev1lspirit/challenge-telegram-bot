@@ -15,5 +15,6 @@ select_challenges_query = \
 """SELECT title, description, ActiveChallenge.owner_id as owner_id, end_date
     FROM (ActiveChallenge JOIN UserCreatedChallenge ON ActiveChallenge.challenge_id=UserCreatedChallenge.id)
         JOIN ChallengeParticipant ON ActiveChallenge.active_challenge_id=ChallengeParticipant.challenge_id
-    WHERE ChallengeParticipant.user_id={user_id};"""
+    WHERE ChallengeParticipant.user_id={user_id} LIMIT 5 OFFSET {offset};"""
 select_username_by_id = "SELECT username FROM Participant WHERE user_id={user_id};"
+total_user_challenges = "SELECT COUNT(challenge_id) FROM ChallengeParticipant WHERE user_id={user_id};"

@@ -45,12 +45,12 @@ class ReplyTypeKeyboard(BaseKeyboard):
 class MainMenuKeyboard(ReplyTypeKeyboard):
 
     def markup(self):
-        about_button = KeyboardButton(text="Про наш бот", callback_data=StartCQC.HELP.value)
+        about_button = KeyboardButton(text=MMBNames.my_profile)
         new_challenge_button = KeyboardButton(text=MMBNames.new_challenge)
         join_challenge_button = KeyboardButton(text=MMBNames.join_current)
         self.builder.row(join_challenge_button, width=1)
         self.builder.row(new_challenge_button, width=1)
-        register_button = KeyboardButton(text=MMBNames.help_btn)
+        register_button = KeyboardButton(text=MMBNames.my_challenges)
         self.builder.row(register_button, about_button, width=2)
         return self.builder.as_markup()
 
@@ -90,14 +90,12 @@ class StartKeyboard(BaseKeyboard):
         return self.builder.as_markup()
 
 
-class ProfileKeyboard(BaseKeyboard):
+class ProfileKeyboard(InlineTypeKeyboard):
 
     def markup(self) -> InlineKeyboardMarkup:
         join_challenge_button = InlineKeyboardButton(text="Присоединиться к челленджу",
                                                      callback_data=StartCQC.NEW.value)
-        rating_table_button = InlineKeyboardButton(text="Мои челленджи", callback_data=ShowMyChallengesCB().pack())
         self.builder.add(join_challenge_button)
-        self.builder.add(rating_table_button)
         self.builder.adjust(2, 1)
         return self.builder.as_markup()
 
@@ -108,6 +106,35 @@ class GetBackKeyboard(BaseKeyboard):
         btn = InlineKeyboardButton(text="Вернуться", callback_data=GetBackCB().pack())
         self.builder.add(btn)
         return self.builder.as_markup()
+
+
+def get_pagination_pattern(*, offset: int, total: int, callback, offset_change=5):
+    pages = total // offset_change if total % offset_change == 0 else total // offset_change + 1
+    pages_count = InlineKeyboardButton(text=f"Страница {offset // offset_change + 1}/{pages}",
+                                       callback_data="some_data")
+    if total <= offset_change:
+        return pages_count,
+    if offset:
+        print(total, offset, total // offset)
+    next_action_button = None
+    back_button = None
+    forward_condition = not offset or (total // offset > 1 if total != 2*offset else False)
+    backward_condition = offset > 0
+    if forward_condition:
+        next_action_button = InlineKeyboardButton(text=PaginationButtonMessages.forward,
+                                                  callback_data=callback(offset=offset + offset_change,
+                                                                                        total=total).pack())
+    if backward_condition:
+        back_button = InlineKeyboardButton(text=PaginationButtonMessages.back,
+                                           callback_data=callback(offset=offset - offset_change,
+                                                                                 total=total).pack())
+
+    to_create = list(filter(lambda btn: btn is not None, [back_button, next_action_button]))
+    if len(to_create) == 2:
+        result = to_create[0], pages_count, to_create[1]
+    else:
+        result = pages_count, to_create[0]
+    return result
 
 
 class SelectChallengeKeyboard(InlineTypeKeyboard):
@@ -133,35 +160,27 @@ class SelectChallengeKeyboard(InlineTypeKeyboard):
             data = ButtonPressedCBData(button_title=title[0], user_id=self.user_id)
             btn = InlineKeyboardButton(text=title[1], callback_data=data.pack())
             self.builder.row(btn, width=1)
-        pages_count = InlineKeyboardButton(text=f"Страница {offset // 5 + 1}/{self.total // 5 + 1}",
-                                           callback_data="some_data")
-
-        next_action_button = None
-        back_button = None
-
-        forward_condition = not offset or self.total // offset > 1
-        backward_condition = offset > 0
-        if forward_condition:
-            next_action_button = InlineKeyboardButton(text=PaginationButtonMessages.forward,
-                                                      callback_data=LoadNextChallengePageCB(offset=offset + 5,
-                                                                                            total=self.total).pack())
-        if backward_condition:
-            back_button = InlineKeyboardButton(text=PaginationButtonMessages.back, callback_data=LoadNextChallengePageCB(offset=offset - 5,
-                                                                                                   total=self.total).pack())
-
-        to_create = list(filter(lambda btn: btn is not None, [back_button, next_action_button]))
-        if len(to_create) == 2:
-            self.builder.row(to_create[0], pages_count, to_create[1], width=3)
-        else:
-            self.builder.row(pages_count, to_create[0], width=2)
-
+        pattern = get_pagination_pattern(offset=offset, total=self.total, callback=LoadNextChallengePageCB)
+        self.builder.row(*pattern, width=len(pattern))
         exit_creation = InlineKeyboardButton(text=strings.back_to_main_menu, callback_data=ExitChallengeSettingCB().pack())
         self.builder.row(exit_creation, width=1)
         return self.builder.as_markup()
 
 
+class UserChallengesPaginationKeyboard(InlineTypeKeyboard):
+
+    def __init__(self, *, offset: int, total_challenges: int):
+        self.total = total_challenges
+        self.offset = offset
+        super().__init__()
+
+    def markup(self, *args) -> InlineKeyboardMarkup:
+        pattern = get_pagination_pattern(offset=self.offset, total=self.total, callback=LoadNextUserChallengePageCB)
+        self.builder.row(*pattern, width=len(pattern))
+        return self.builder.as_markup()
+
+
 class ChallengeDurationKeyboard(InlineTypeKeyboard):
-    _saved_markup: tp.Optional[InlineKeyboardMarkup] = None
 
     def markup(self, include_back=True) -> InlineKeyboardMarkup:
         one_week = InlineKeyboardButton(text=ChallengeDurationPhrases.one_week,

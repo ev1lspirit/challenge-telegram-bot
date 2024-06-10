@@ -14,8 +14,6 @@ from strings import CreateNewChallengeMessages, ChallengeDurationPhrases
 router = Router(name=__name__)
 
 
-
-
 @router.callback_query(
     CreateUserOwnChallengeCB.filter(),
     ChallengeCreationStates.choosing_challenge

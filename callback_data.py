@@ -14,6 +14,16 @@ class LoadNextChallengePageCB(CallbackData, prefix="ld-n"):
     total: int
 
 
+class LoadNextUserChallengePageCB(CallbackData, prefix="ldn-n"):
+    offset: int
+    total: int
+
+
+class LoadPreviousUserChallengePageCB(CallbackData, prefix="ldp-n"):
+    offset: int
+    total: int
+
+
 class LoadPreviousChallengePageCB(CallbackData, prefix="ld-p"):
     offset: int
     total: int
