@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import datetime
-from typing import NamedTuple
+import typing as tp
 
 
 @dataclass
@@ -9,8 +9,26 @@ class UserChallenge:
     description: str
     owner_id: int
     end_date: datetime.datetime
+    username: tp.Optional[str] = None
 
-class ChatTypes(NamedTuple):
+
+@dataclass
+class ActiveChallenge:
+    active_challenge_id: int
+    owner_id: int
+    owner_username: str
+    challenge_id: int
+    end_date: datetime.datetime
+    title: str
+
+
+@dataclass
+class ActiveChallengeParticipant:
+    user_id: int
+    challenge_id: int
+
+
+class ChatTypes(tp.NamedTuple):
     PRIVATE = "private"
     GROUP = "group"
     SUPERGROUP = "supergroup"

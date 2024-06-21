@@ -16,5 +16,20 @@ select_challenges_query = \
     FROM (ActiveChallenge JOIN UserCreatedChallenge ON ActiveChallenge.challenge_id=UserCreatedChallenge.id)
         JOIN ChallengeParticipant ON ActiveChallenge.active_challenge_id=ChallengeParticipant.challenge_id
     WHERE ChallengeParticipant.user_id={user_id} LIMIT 5 OFFSET {offset};"""
-select_username_by_id = "SELECT username FROM Participant WHERE user_id={user_id};"
+select_username_by_id = "SELECT user_id, username FROM Participant WHERE user_id IN ({id_list});"
 total_user_challenges = "SELECT COUNT(challenge_id) FROM ChallengeParticipant WHERE user_id={user_id};"
+select_expired_challenges = \
+    """SELECT active_challenge_id, ActiveChallenge.owner_id, username, challenge_id, end_date, title 
+        FROM (ActiveChallenge JOIN UserCreatedChallenge ON ActiveChallenge.challenge_id=UserCreatedChallenge.id)
+            JOIN Participant ON ActiveChallenge.owner_id=Participant.user_id
+         WHERE end_date < timestamp '{timestamp}';"""
+select_expired_participants = \
+    """SELECT user_id, challenge_id FROM ChallengeParticipant
+        WHERE challenge_id IN ({challenge_list});"""
+delete_expired_challenges_transaction = \
+    """BEGIN;
+WITH delete_active AS (
+    DELETE FROM ActiveChallenge WHERE active_challenge_id IN ({challenge_id_list}) RETURNING active_challenge_id
+)
+DELETE FROM ChallengeParticipant WHERE challenge_id IN (SELECT active_challenge_id FROM delete_active);
+COMMIT;"""

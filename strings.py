@@ -4,11 +4,21 @@ from aiogram.utils.formatting import as_list, as_key_value, as_marked_section, T
 
 from emoji import emojize
 
+from bot_types import ActiveChallenge
 
 bot_typedefs = ("Ботослон", "Ботяра", "Слонобот")
 choose_action = "Выберите действие"
 challenge_creation_menu = f'{emojize(":desktop_computer:")} Меню создания челленджа'
 back_to_main_menu = emojize(':cross_mark:')
+
+
+class ExpiredChallengeMessageTemplate:
+    def __init__(self, active_challenge: ActiveChallenge):
+        self.active_challenge = active_challenge
+
+    def toText(self):
+        owner_signature = self.active_challenge.owner_username if self.active_challenge.owner_username else self.active_challenge.owner_id
+        return f"Челлендж <b>{self.active_challenge.title}</b>, созданный {owner_signature}, завершился!"
 
 
 @dataclass
@@ -88,11 +98,10 @@ class ChallengeListTemplates:
         return as_list(
                 Bold(f"{emojize(':pushpin:')} {self.title}"),
                 f"{self.description}",
-                as_key_value(f"   {emojize(':writing_hand:')} Автор", f"@{self.username}"),
+                as_key_value(f"   {emojize(':writing_hand:')} Автор", f"{self.username}"),
                 as_key_value(f"   {emojize(':calendar:')} Челлендж закончится через", f"{self.timedelta}"),
                 "\n"
         )
-
 
 @dataclass
 class DatetimeEndings:

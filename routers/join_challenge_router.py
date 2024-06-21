@@ -10,7 +10,7 @@ from callback_data import *
 from keyboard_styles.keyboards import (ExistingOrNewChallengeKeyboard,
                                        MainMenuKeyboard)
 from filters import PrivateMessagesScope
-from db import select_query, insert
+from db import select_query, insert, ChallengeDB
 from strings import (
     JoinChallengePhrases,
     ChallengeDurationPhrases,
@@ -23,6 +23,8 @@ from fsm_states import ChallengeCreationStates
 
 router = Router(name='JoinChallengeRouter')
 router.message.middleware(RequireRegistrationMiddleware())
+router.message.filter(PrivateMessagesScope())
+router.callback_query.filter(PrivateMessagesScope())
 
 
 async def get_to_main_menu(message: Message, state: FSMContext):
@@ -34,8 +36,7 @@ async def get_to_main_menu(message: Message, state: FSMContext):
 
 @router.message(
     F.text.capitalize() == MMBNames.new_challenge,
-    StateFilter(None),
-    PrivateMessagesScope()
+    StateFilter(None)
 )
 async def create_new_challenge_handler(message: Message, state: FSMContext):
     await message.reply(text=strings.challenge_creation_menu, reply_markup=aiogram.types.ReplyKeyboardRemove())
@@ -47,12 +48,11 @@ async def create_new_challenge_handler(message: Message, state: FSMContext):
 @router.callback_query(
     CreateDefaultChallengeCB.filter(),
     ChallengeCreationStates.choosing_challenge,
-    PrivateMessagesScope()
 )
 async def create_default_challenge_handler(callback: aiogram.types.CallbackQuery):
-    total_challenges = await select_query(queries.select_total_challenges.format(owner_id=callback.from_user.id))
-    challenge_list = await select_query(queries.select_challenges.format(user_id=callback.from_user.id, offset=0))
-
+    with ChallengeDB() as conn:
+        total_challenges = await conn.select(queries.select_total_challenges.format(owner_id=callback.from_user.id))
+        challenge_list = await conn.select(queries.select_challenges.format(user_id=callback.from_user.id, offset=0))
     markup = SelectChallengeKeyboard(callback.from_user.id, challenge_list, total_challenges[0][0]).markup()
     await callback.message.edit_text(text=f'{JoinChallengePhrases.just_joined}\n{JoinChallengePhrases.available_challenges}')
     await callback.message.edit_reply_markup(reply_markup=markup)
@@ -66,12 +66,12 @@ async def create_default_challenge_handler(callback: aiogram.types.CallbackQuery
 @router.callback_query(
     LoadPreviousChallengePageCB.filter(),
     ChallengeCreationStates.choosing_challenge,
-    PrivateMessagesScope()
 )
 async def load_next_page_handler(callback: aiogram.types.CallbackQuery, callback_data: LoadNextChallengePageCB):
     offset = callback_data.offset
     total = callback_data.total
-    button_list = await select_query(queries.select_challenges.format(user_id=callback.from_user.id,
+    with ChallengeDB() as conn:
+        button_list = await conn.select(queries.select_challenges.format(user_id=callback.from_user.id,
                                                                       offset=offset))
     markup = SelectChallengeKeyboard(callback.from_user.id, button_list, total).markup(offset=offset)
     await callback.message.edit_reply_markup(reply_markup=markup)
@@ -85,7 +85,10 @@ async def challenge_chosen_handler(callback: CallbackQuery, callback_data: Butto
     challenge_id, user_id = callback_data.button_title, callback_data.user_id
     query = queries.check_if_challenge_taken.format(user_id=callback_data.user_id,
                                                     challenge_id=callback_data.button_title)
-    if await select_query(query):
+    with ChallengeDB() as conn:
+        query_result = await conn.select(query)
+
+    if query_result:
         await callback.message.answer(text=InterruptionMessages.user_already_in_challenge)
         return
     markup = ChallengeDurationKeyboard().markup()
@@ -97,8 +100,7 @@ async def challenge_chosen_handler(callback: CallbackQuery, callback_data: Butto
 
 @router.callback_query(
     ChallengeDurationCBData.filter(),
-    ChallengeCreationStates.choosing_challenge_length,
-    PrivateMessagesScope()
+    ChallengeCreationStates.choosing_challenge_length
 )
 async def add_challenge_to_the_database(callback: CallbackQuery, callback_data: ChallengeDurationCBData, state: FSMContext):
     state_data = await state.get_data()
@@ -117,7 +119,7 @@ async def add_challenge_to_the_database(callback: CallbackQuery, callback_data: 
 
     weeks = callback_data.weeks
     current_time = datetime.datetime.now()
-    challenge_end_time = current_time + datetime.timedelta(weeks=weeks)
+    challenge_end_time = current_time + datetime.timedelta(seconds=10) #weeks=weeks
     creation_time = current_time.strftime("%d/%m/%Y %H:%M:%S")
     end_time = challenge_end_time.strftime("%d/%m/%Y %H:%M:%S")
     print(challenge_id)

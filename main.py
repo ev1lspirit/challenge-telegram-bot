@@ -5,6 +5,11 @@ import redis
 # C:\Users\11\Desktop\challenge-bot\UltimateChallengeBot\db\generate.sql
 
 from aiogram import Bot, Dispatcher
+from pytz import utc
+
+from bot_types import ActiveChallengeParticipant
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from functools import partial
 import asyncio
 from os import getenv
 import logging
@@ -16,8 +21,7 @@ from routers import (
     join_challenge_router,
     profile_router,
     special_events_router)
-from db import DBInteractor
-
+from scheduler_jobs import check_for_expired_challenges
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -30,11 +34,22 @@ dp.include_router(special_events_router.router)
 dp.include_router(user_own_challenge_creation_router.router)
 
 
+aioscheduler = AsyncIOScheduler(timezone=utc)
+
+
+async def send_notification_to_user(participants: tuple[ActiveChallengeParticipant, ...]):
+    pass
+
+
 async def main():
-    interactor = DBInteractor(db_user=getenv("DB_USER"), db_name=getenv("DB_NAME"), db_password=getenv("DB_PASSWORD"))
+    expired_checker_job = partial(check_for_expired_challenges, bot=bot)
+    aioscheduler.add_job(expired_checker_job, 'interval', seconds=30)
+    aioscheduler.start()
     await dp.start_polling(bot)
+
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     asyncio.run(main())
+
 

@@ -37,6 +37,13 @@ CREATE TABLE ChallengeParticipant (
     PRIMARY KEY (user_id, challenge_id)
 );
 
+CREATE TABLE ChallengeUpdate (
+    id BIGINT GENERATEDBY DEFAULT AS IDENTITY PRIMARY KEY,
+    user_id BIGINT REFERENCES ChallengeParticipant(user_id),
+    challenge_id INTEGER REFERENCES ChallengeParticipant(challenge_id),
+    update_text TEXT NOT NULL
+)
+
 INSERT INTO UserCreatedChallenge (owner_id, title, description, creation_date) VALUES (0, 'Потребление овощей и фруктов', 'Челлендж включает в себя потребление различных овощей и фруктов каждый день в размере не менее 500 г.', current_timestamp);
 INSERT INTO UserCreatedChallenge (owner_id, title, description, creation_date) VALUES (0, 'Здоровый сон', 'Челлендж включает в себя полноценный сон в установленное количество часов', current_timestamp);
 INSERT INTO UserCreatedChallenge (owner_id, title, description, creation_date) VALUES (0, 'Гидратация', 'Челлендж включает в себя потребление не менее 2 литров чистой воды в день.', current_timestamp);

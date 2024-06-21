@@ -6,7 +6,6 @@ from aiogram.types.keyboard_button import KeyboardButton
 
 import strings
 from callback_data import *
-from commands import StartCallbackQueryCommands as StartCQC
 from strings import ChallengeDurationPhrases
 import abc
 import typing as tp
@@ -74,29 +73,6 @@ class ExistingOrNewChallengeKeyboard(InlineTypeKeyboard):
         own_challenge_button = InlineKeyboardButton(text=EoNButtonNames.new_challenge,
                                                     callback_data=CreateUserOwnChallengeCB().pack())
         self.builder.row(own_challenge_button, default_challenge_button, width=2)
-        return self.builder.as_markup()
-
-class StartKeyboard(BaseKeyboard):
-    def markup(self) -> InlineKeyboardMarkup:
-        about_button = InlineKeyboardButton(text="Про наш бот", callback_data=StartCQC.HELP.value)
-        new_challenge_button = InlineKeyboardButton(text="Создать новый челлендж",
-                                                         callback_data=CreateUserOwnChallengeCB().pack())
-        join_challenge_button = InlineKeyboardButton(text="Присоединиться к существующему челленджу",
-            callback_data=JoinExistingChallengeCB().pack())
-        self.builder.row(join_challenge_button, width=1)
-        self.builder.row(new_challenge_button, width=1)
-        register_button = InlineKeyboardButton(text="Помощь", callback_data=HelpButtonCB().pack())
-        self.builder.row(register_button, about_button, width=2)
-        return self.builder.as_markup()
-
-
-class ProfileKeyboard(InlineTypeKeyboard):
-
-    def markup(self) -> InlineKeyboardMarkup:
-        join_challenge_button = InlineKeyboardButton(text="Присоединиться к челленджу",
-                                                     callback_data=StartCQC.NEW.value)
-        self.builder.add(join_challenge_button)
-        self.builder.adjust(2, 1)
         return self.builder.as_markup()
 
 

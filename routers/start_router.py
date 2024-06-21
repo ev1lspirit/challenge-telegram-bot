@@ -1,16 +1,19 @@
+import logging
+
 from aiogram import Router
-from aiogram.filters import CommandStart, Command, StateFilter
-from aiogram.types import Message
+from aiogram.filters import CommandStart, Command, StateFilter, ChatMemberUpdatedFilter, MEMBER
+from aiogram.types import Message, ChatMemberUpdated
+from filters import PrivateMessagesScope
 from middlewares import RequireRegistrationMiddleware
-from db import add_user_to_bot
 from keyboard_styles.keyboards import MainMenuKeyboard
 from strings import StartPhrases
-from validators import is_user_registered
 
 __all__ = "router"
 
 router = Router(name="StartRouter")
 router.message.middleware(RequireRegistrationMiddleware())
+router.message.filter(PrivateMessagesScope())
+router.my_chat_member.filter(PrivateMessagesScope())
 
 
 @router.message(
