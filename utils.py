@@ -1,5 +1,12 @@
 import datetime
+import logging
+from functools import partial
+from uuid import uuid4
 
+import aiogram
+from aiogram.exceptions import TelegramForbiddenError
+
+from bot_types import ActiveChallengeParticipant
 from strings import DatetimeEndings
 
 
@@ -15,6 +22,29 @@ def get_ending(time_measure: int, time_measure_key: str):
     else:
         ending = source[2]
     return ending
+
+
+def handle(async_func=None, error=None, *errors):
+    if async_func is None:
+        return partial(handle, error=error, *errors)
+    logger = logging.getLogger(async_func.__name__ if not isinstance(async_func, partial) else async_func.func.__name__)
+
+    async def wrapper(*args, **kwargs):
+        try:
+            return await async_func(*args, **kwargs)
+        except (error, *errors) as exc:
+            logger.error(f"{exc.__class__.__name__}: {str(exc)}")
+            return None
+    return wrapper
+
+
+@handle(error=TelegramForbiddenError)
+async def check_if_user_reachable(bot: aiogram.Bot, user: ActiveChallengeParticipant):
+    return await bot.send_chat_action(chat_id=user.user_id, action="typing")
+
+
+def generate_unique_id():
+    return str(uuid4()).replace('-', '')
 
 
 def get_timedelta(date: datetime.datetime):
@@ -33,7 +63,10 @@ def get_timedelta(date: datetime.datetime):
         template = f"{days} {day_ending} и {hours} {hour_ending}"
         if not days:
             template = f"{hours} {hour_ending}"
-        return template
+            if not hours:
+                template = f"Менее часа"
     elif not days:
         template = f"{hours} {hour_ending}"
+        if not hours :
+            template = f"Менее часа"
     return template

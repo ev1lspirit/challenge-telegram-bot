@@ -24,6 +24,10 @@ class LoadPreviousUserChallengePageCB(CallbackData, prefix="ldp-n"):
     total: int
 
 
+class BackToMenuCB(CallbackData, prefix="me"):
+    pass
+
+
 class LoadPreviousChallengePageCB(CallbackData, prefix="ld-p"):
     offset: int
     total: int
@@ -60,4 +64,20 @@ class ShowMyChallengesCB(CallbackData, prefix="show-ch"):
 
 class JoinExistingChallengeCB(CallbackData, prefix="join-c"):
     pass
+
+
+class AcceptParticipantCB(CallbackData, prefix="a-r"):
+    user_id: int
+
+    active_challenge_id: int
+
+
+class RejectParticipantCB(CallbackData, prefix="r-r"):
+    user_id: int
+    active_challenge_id: int
+
+
+class BanParticipantFromJoiningCB(CallbackData, prefix="bpf"):
+    receiver: int
+
 

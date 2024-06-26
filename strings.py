@@ -12,13 +12,39 @@ challenge_creation_menu = f'{emojize(":desktop_computer:")} Меню созда�
 back_to_main_menu = emojize(':cross_mark:')
 
 
-class ExpiredChallengeMessageTemplate:
+message_after_challenge_creation = \
+("""{check_mark} Ваш челлендж успешно создан!
+<b>Ваш пригласительный код</b>: <code><i>{{join_code}}</i></code>
+
+{ping_pong} Поделитесь им с друзьями и проходите испытания вместе!"""
+ .format(ping_pong=emojize(':ping_pong:'), check_mark=emojize(':check_mark_button:')))
+accept_message = \
+    """{pencil} {{username}} хочет присоединиться к челленджу <u>{{title}}</u>.
+Подтвердите участие данного пользователя.
+""".format(pencil=emojize(':pencil:'))
+
+
+@dataclass
+class WaitingForCodeMessage:
+    invalid_code = f"{emojize(':woman_gesturing_NO:')} Код некорректен, введите другой или отмените действие."
+    unable_to_join_challenge = f"{emojize(':woman_gesturing_NO:')} Вы не можете присоединиться к данному челленджу."
+    already_joined = f"{emojize(':woman_tipping_hand:')} Вы уже участвуете в данном челлендже!"
+    author_unreachable = f"{emojize(':face_with_head_bandage:')} Заявка не была отправлена так как нет соединения с автором челленджа!"
+    request_sent = f"{emojize(':check_mark_button:')} Заявка на вступление в челлендж отправлена администратору!"
+
+
+class ExpiredChallengeMessage:
     def __init__(self, active_challenge: ActiveChallenge):
         self.active_challenge = active_challenge
 
     def toText(self):
         owner_signature = self.active_challenge.owner_username if self.active_challenge.owner_username else self.active_challenge.owner_id
         return f"Челлендж <b>{self.active_challenge.title}</b>, созданный {owner_signature}, завершился!"
+
+
+@dataclass
+class JoiningChallengeMessages:
+    enter_host_id = f"{emojize(':pen:')} Введите пригласительный код, выданный организатором челленджа"
 
 
 @dataclass

@@ -9,7 +9,7 @@ from validators import is_user_registered
 from bot_types import ChatTypes
 
 __all__ = ["SpecialRegisterFilter", "RequireAdmin", "RequireRegistration",
-           "PrivateMessagesScope"]
+           "PrivateMessageScope"]
 
 
 class SpecialRegisterFilter(Filter):
@@ -46,7 +46,7 @@ class RequireRegistration(Filter):
         return is_registered
 
 
-class PrivateMessagesScope(Filter):
+class PrivateMessageScope(Filter):
 
     async def __call__(self, message: Message):
         if isinstance(message, CallbackQuery):

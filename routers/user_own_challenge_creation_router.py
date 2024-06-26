@@ -6,15 +6,15 @@ from aiogram.fsm.context import FSMContext
 
 import strings
 from callback_data import CreateUserOwnChallengeCB, ChallengeDurationCBData
-from filters import PrivateMessagesScope
+from filters import PrivateMessageScope
 from fsm_states import ChallengeCreationStates
 from keyboard_styles import ChallengeDurationKeyboard
 from keyboard_styles.keyboards import ExitBackToMainMenuButton, MainMenuKeyboard
 from strings import CreateNewChallengeMessages, ChallengeDurationPhrases
 
 router = Router(name=__name__)
-router.message.filter(PrivateMessagesScope())
-router.callback_query.filter(PrivateMessagesScope())
+router.message.filter(PrivateMessageScope())
+router.callback_query.filter(PrivateMessageScope())
 
 
 @router.callback_query(

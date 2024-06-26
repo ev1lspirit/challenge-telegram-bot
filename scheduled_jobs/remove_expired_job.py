@@ -1,30 +1,24 @@
 import datetime
 import logging
-from collections import defaultdict
-from os import getenv
-from pprint import pprint
-
 import aiogram
 import typing as tp
-
 from aiogram.enums import ParseMode
-
 import queries
-from db import select_query, insert
 from bot_types import ActiveChallenge, ActiveChallengeParticipant
-from db.dbconnector import BaseConnectionState, ChallengeDB
-from strings import ExpiredChallengeMessageTemplate
-from aiogram.methods.send_chat_action import SendChatAction
+from db import ChallengeDB
+from strings import ExpiredChallengeMessage
+from aiogram.exceptions import TelegramForbiddenError, TelegramNotFound
+from utils import handle
+
+logger = logging.getLogger(__name__)
 
 
+@handle(error=TelegramForbiddenError)
 async def check_if_user_reachable(bot: aiogram.Bot, user: ActiveChallengeParticipant):
-    try:
-        return await bot.send_chat_action(chat_id=user.user_id, action="typing")
-    except Exception as exc:
-        logging.error(str(exc))
-        return False
+    return await bot.send_chat_action(chat_id=user.user_id, action="typing")
 
 
+@handle(error=TelegramNotFound)
 async def send_notification_expired_challenge_participants(
         bot: aiogram.Bot,
         expired_challenges: tp.Tuple[ActiveChallenge],
@@ -34,7 +28,7 @@ async def send_notification_expired_challenge_participants(
             continue
         challenges = filter(lambda challenge: user.challenge_id == challenge.active_challenge_id, expired_challenges)
         for challenge in challenges:
-            await bot.send_message(chat_id=user.user_id, text=ExpiredChallengeMessageTemplate(challenge).toText(),
+            await bot.send_message(chat_id=user.user_id, text=ExpiredChallengeMessage(challenge).toText(),
                                    parse_mode=ParseMode.HTML)
 
 

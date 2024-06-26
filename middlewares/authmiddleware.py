@@ -1,5 +1,10 @@
+import logging
+
 from aiogram.dispatcher.middlewares.base import BaseMiddleware
 import typing as tp
+
+from aiogram.exceptions import AiogramError
+
 import queries
 from aiogram.types import TelegramObject, CallbackQuery, Message
 from db import select_query, add_user_to_bot
@@ -18,3 +23,17 @@ class RequireRegistrationMiddleware(BaseMiddleware):
         if not await self.check_if_registered(event.from_user.id):
             await add_user_to_bot(user_id=event.from_user.id, username=event.from_user.username)
         return await handler(event, data)
+
+
+class CatchAiogramErrorMiddleware(BaseMiddleware):
+
+    def __init__(self, logger):
+        self.logger: logging.Logger = logger
+
+    async def __call__(self, handler: tp.Callable[
+        [TelegramObject, tp.Dict[str, tp.Any]], tp.Awaitable[tp.Any]], event: Message,
+                        data: tp.Dict[str, tp.Any]) -> tp.Any:
+        try:
+            return await handler(event, data)
+        except AiogramError as E:
+            self.logger.error(str(E).capitalize())

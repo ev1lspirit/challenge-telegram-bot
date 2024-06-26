@@ -1,167 +1,146 @@
-import datetime
-from middlewares import RequireRegistrationMiddleware
-import aiogram.types
+import logging
+
+import aiogram
 from aiogram import Router, F
+from aiogram.enums import ParseMode
 from aiogram.filters import StateFilter
-from aiogram.types import Message, CallbackQuery
-import queries
-import strings
-from callback_data import *
-from keyboard_styles.keyboards import (ExistingOrNewChallengeKeyboard,
-                                       MainMenuKeyboard)
-from filters import PrivateMessagesScope
-from db import select_query, insert, ChallengeDB
-from strings import (
-    JoinChallengePhrases,
-    ChallengeDurationPhrases,
-    MainMenuButtonNames as MMBNames,
-    InterruptionMessages
-)
-from keyboard_styles import ChallengeDurationKeyboard, SelectChallengeKeyboard
 from aiogram.fsm.context import FSMContext
-from fsm_states import ChallengeCreationStates
+from aiogram.types import Message, ReplyKeyboardRemove
+from bot_types import ChatTypes, ActiveChallenge, ActiveChallengeParticipant
+from callback_data import AcceptParticipantCB, RejectParticipantCB, BanParticipantFromJoiningCB
+from db import ChallengeDB
+from filters import PrivateMessageScope
+from fsm_states import JoiningChallengeStates
+from keyboard_styles.keyboards import GetBackKeyboard, AcceptOrRejectKeyboard
+from middlewares.authmiddleware import CatchAiogramErrorMiddleware
+from queries import select_challenge_by_code, is_user_joined, prevent_user_from_joining, check_if_user_can_join
+from routers.new_challenge_router import get_to_main_menu
+from strings import MainMenuButtonNames, JoiningChallengeMessages, accept_message, WaitingForCodeMessage
+from utils import check_if_user_reachable
 
-router = Router(name='JoinChallengeRouter')
-router.message.middleware(RequireRegistrationMiddleware())
-router.message.filter(PrivateMessagesScope())
-router.callback_query.filter(PrivateMessagesScope())
+private_join_router = Router(name=f"{__name__}_private")
+group_join_router = Router(name=f"{__name__}_public")
+
+logger = logging.getLogger(private_join_router.name)
+
+private_join_router.message.filter(PrivateMessageScope())
+private_join_router.callback_query.filter(PrivateMessageScope())
+private_join_router.callback_query.middleware(CatchAiogramErrorMiddleware(logger))
+private_join_router.message.middleware(CatchAiogramErrorMiddleware(logger))
+group_join_router.message.filter(F.chat.type.in_({ChatTypes.GROUP, ChatTypes.SUPERGROUP}))
 
 
-async def get_to_main_menu(message: Message, state: FSMContext):
-    await state.clear()
-    markup = MainMenuKeyboard().markup()
-    markup.resize_keyboard = True
-    await message.answer(text=strings.BotMenus.main_menu, reply_markup=markup)
-
-
-@router.message(
-    F.text.capitalize() == MMBNames.new_challenge,
-    StateFilter(None)
+@private_join_router.message(
+    StateFilter(None),
+    F.text.capitalize() == MainMenuButtonNames.join_current
 )
-async def create_new_challenge_handler(message: Message, state: FSMContext):
-    await message.reply(text=strings.challenge_creation_menu, reply_markup=aiogram.types.ReplyKeyboardRemove())
-    markup = ExistingOrNewChallengeKeyboard().markup()
-    await message.answer(text=strings.choose_action, reply_markup=markup, protect_content=True)
-    await state.set_state(ChallengeCreationStates.choosing_challenge)
+async def join_existing_challenge_handler(message: Message, state: FSMContext):
+    markup = GetBackKeyboard().markup()
+    await message.reply(JoiningChallengeMessages.enter_host_id, reply_markup=markup)
+    await state.set_state(JoiningChallengeStates.waiting_for_entrance_code)
 
 
-@router.callback_query(
-    CreateDefaultChallengeCB.filter(),
-    ChallengeCreationStates.choosing_challenge,
+@private_join_router.callback_query(
+    BanParticipantFromJoiningCB.filter()
 )
-async def create_default_challenge_handler(callback: aiogram.types.CallbackQuery):
+async def prevent_user_from_joining_challenge_handler(
+        callback: aiogram.types.CallbackQuery,
+        callback_data: BanParticipantFromJoiningCB
+):
     with ChallengeDB() as conn:
-        total_challenges = await conn.select(queries.select_total_challenges.format(owner_id=callback.from_user.id))
-        challenge_list = await conn.select(queries.select_challenges.format(user_id=callback.from_user.id, offset=0))
-    markup = SelectChallengeKeyboard(callback.from_user.id, challenge_list, total_challenges[0][0]).markup()
-    await callback.message.edit_text(text=f'{JoinChallengePhrases.just_joined}\n{JoinChallengePhrases.available_challenges}')
-    await callback.message.edit_reply_markup(reply_markup=markup)
-
-
-@router.callback_query(
-    LoadNextChallengePageCB.filter(),
-    ChallengeCreationStates.choosing_challenge,
-    PrivateMessagesScope()
-)
-@router.callback_query(
-    LoadPreviousChallengePageCB.filter(),
-    ChallengeCreationStates.choosing_challenge,
-)
-async def load_next_page_handler(callback: aiogram.types.CallbackQuery, callback_data: LoadNextChallengePageCB):
-    offset = callback_data.offset
-    total = callback_data.total
-    with ChallengeDB() as conn:
-        button_list = await conn.select(queries.select_challenges.format(user_id=callback.from_user.id,
-                                                                      offset=offset))
-    markup = SelectChallengeKeyboard(callback.from_user.id, button_list, total).markup(offset=offset)
-    await callback.message.edit_reply_markup(reply_markup=markup)
-
-
-@router.callback_query(
-    ButtonPressedCBData.filter(),
-    ChallengeCreationStates.choosing_challenge
-)
-async def challenge_chosen_handler(callback: CallbackQuery, callback_data: ButtonPressedCBData, state: FSMContext):
-    challenge_id, user_id = callback_data.button_title, callback_data.user_id
-    query = queries.check_if_challenge_taken.format(user_id=callback_data.user_id,
-                                                    challenge_id=callback_data.button_title)
-    with ChallengeDB() as conn:
-        query_result = await conn.select(query)
-
-    if query_result:
-        await callback.message.answer(text=InterruptionMessages.user_already_in_challenge)
-        return
-    markup = ChallengeDurationKeyboard().markup()
-    await callback.message.edit_text(text=ChallengeDurationPhrases.question)
-    await callback.message.edit_reply_markup(reply_markup=markup)
-    await state.set_state(ChallengeCreationStates.choosing_challenge_length)
-    await state.set_data({"challenge_id": challenge_id, "user_id": user_id})
-
-
-@router.callback_query(
-    ChallengeDurationCBData.filter(),
-    ChallengeCreationStates.choosing_challenge_length
-)
-async def add_challenge_to_the_database(callback: CallbackQuery, callback_data: ChallengeDurationCBData, state: FSMContext):
-    state_data = await state.get_data()
-    challenge_id, user_id = state_data.get("challenge_id"), state_data.get("user_id")
-
-    if challenge_id is None or user_id is None:
-        title, desc = state_data.pop("title"), state_data.pop("desc")
-        user_id = callback.from_user.id
-        query = queries.insert_new_user_challenge.format(
-            owner_id=user_id,
-            title=title,
-            description=desc,
-            creation_date=datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        await conn.execute(
+            prevent_user_from_joining.format(
+                initiator_id=callback.from_user.id,
+                receiver_id=callback_data.receiver
+            ),
+            autocommit=True
         )
-        challenge_id = await insert(query, return_last=True)
-
-    weeks = callback_data.weeks
-    current_time = datetime.datetime.now()
-    challenge_end_time = current_time + datetime.timedelta(seconds=10) #weeks=weeks
-    creation_time = current_time.strftime("%d/%m/%Y %H:%M:%S")
-    end_time = challenge_end_time.strftime("%d/%m/%Y %H:%M:%S")
-    print(challenge_id)
-    query = queries.insert_active_transaction.format(user_id=user_id,
-                                                   challenge_id=challenge_id,
-                                                   creation_date=creation_time,
-                                                   end_date=end_time)
-    result = await insert(query)
-    if result is not None:
-        await callback.message.edit_text(text="Челлендж успешно создан!")
-    else:
-        await callback.message.edit_text(text="Что-то пошло не так")
-    await get_to_main_menu(callback.message, state)
+    await callback.message.edit_text("Пользователь успешно заблокирован!")
+    await callback.message.delete_reply_markup()
 
 
-@router.callback_query(
-    GetBackCB.filter(),
-    ChallengeCreationStates.choosing_challenge_length
+@private_join_router.callback_query(
+    AcceptParticipantCB.filter()
 )
-async def get_back_to_challenge_choice_menu_handler(callback: aiogram.types.CallbackQuery, state: FSMContext):
-    await state.set_state(ChallengeCreationStates.choosing_challenge)
-    await create_default_challenge_handler(callback)
+async def accept_participant_callback_handler(
+        callback: aiogram.types.CallbackQuery, callback_data: AcceptParticipantCB, bot: aiogram.Bot):
+    with ChallengeDB() as conn:
+        await conn.execute(
+            "INSERT INTO ChallengeParticipant (user_id, challenge_id, is_kicked) VALUES "
+            "({user_id}, {challenge_id}, 'f');".format(user_id=callback_data.user_id,
+                                                       challenge_id=callback_data.active_challenge_id),
+            autocommit=True
+        )
+    if not await check_if_user_reachable(
+            bot,
+            ActiveChallengeParticipant(user_id=callback_data.user_id,
+                                                       challenge_id=callback_data.active_challenge_id)
+    ):
+        logger.info(f"{callback_data.user_id} is not reachable. Doing nothing..")
+        return
+    user_credentials = f'@{callback.from_user.username}' if callback.from_user.username else str(callback.from_user.id)
+    await bot.send_message(callback_data.user_id,
+                           text=f"Заявка на вступление в челлендж одобрена {user_credentials}!")
+    await callback.message.edit_text(
+        text="Пользователь принят в челлендж!"
+    )
+    await callback.message.delete_reply_markup()
 
 
-@router.callback_query(
-    ExitChallengeSettingCB.filter(),
-    ~StateFilter(None)
+@private_join_router.callback_query(
+    RejectParticipantCB.filter()
 )
-async def exit_challenge_creation_handler(callback: aiogram.types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    markup = MainMenuKeyboard().markup()
-    markup.resize_keyboard = True
-    await callback.message.answer(text=strings.BotMenus.main_menu, reply_markup=markup)
-    await callback.message.edit_text(text="Создание челленджа отменено")
+async def reject_participant_callback_handler(
+        callback: aiogram.types.CallbackQuery
+):
+    await callback.message.edit_text(f"Заявка отклонена")
+    await callback.message.delete_reply_markup()
 
 
-@router.message(
-    ~StateFilter(None, ChallengeCreationStates.choosing_challenge_title,
-                 ChallengeCreationStates.setting_challenge_description),
+@private_join_router.message(
+    JoiningChallengeStates.waiting_for_entrance_code
 )
-async def action_during_choosing_challenge_process_handler(message: Message, state: FSMContext):
-    await message.reply(text=InterruptionMessages.challenge_interrupt_string)
+async def receiving_code(message: Message, bot: aiogram.Bot, state: FSMContext):
+    with ChallengeDB() as conn:
+        active_challenge = await conn.select(
+            select_challenge_by_code.format(join_code=message.text)
+        )
+        if not active_challenge:
+            await message.reply(WaitingForCodeMessage.invalid_code)
+            return
 
+        challenge = ActiveChallenge(*active_challenge[0])
+        if await conn.select(
+                check_if_user_can_join.format(
+                    initiator_id=challenge.owner_id,
+                    receiver_id=message.from_user.id
+                )):
+            await message.answer(WaitingForCodeMessage.unable_to_join_challenge)
+            return
+
+        if await conn.select(is_user_joined.format(
+                user_id=message.from_user.id,
+                challenge_id=challenge.active_challenge_id
+        )):
+            await message.reply(WaitingForCodeMessage.already_joined)
+            return
+
+        markup = AcceptOrRejectKeyboard(
+            message.from_user.id,
+            challenge.active_challenge_id
+        ).markup()
+
+        if not await check_if_user_reachable(
+                bot,
+                ActiveChallengeParticipant(user_id=challenge.owner_id, challenge_id=challenge.challenge_id)):
+            await message.answer(WaitingForCodeMessage.author_unreachable)
+            return
+        await bot.send_message(challenge.owner_id,
+                               text=accept_message.format(title=challenge.title,
+                                                        username=f"@{message.from_user.username}"
+                                                    if message.from_user.username else message.from_user.id),
+                               reply_markup=markup, parse_mode=ParseMode.HTML)
+        await message.answer(WaitingForCodeMessage.request_sent)
+        await get_to_main_menu(message, state)
 
 

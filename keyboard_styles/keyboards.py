@@ -3,6 +3,7 @@ import logging
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder, KeyboardBuilder
 from aiogram.types.keyboard_button import KeyboardButton
+from emoji import emojize
 
 import strings
 from callback_data import *
@@ -76,10 +77,35 @@ class ExistingOrNewChallengeKeyboard(InlineTypeKeyboard):
         return self.builder.as_markup()
 
 
-class GetBackKeyboard(BaseKeyboard):
+class AcceptOrRejectKeyboard(InlineTypeKeyboard):
+
+    def __init__(self, user_id, active_challenge_id):
+        self.user_id = user_id
+        self.active_challenge_id = active_challenge_id
+        super().__init__()
 
     def markup(self, *args) -> InlineKeyboardMarkup:
-        btn = InlineKeyboardButton(text="Вернуться", callback_data=GetBackCB().pack())
+        accept_button = InlineKeyboardButton(text=emojize(':check_mark_button:'),
+                                             callback_data=AcceptParticipantCB(
+                                                 user_id=self.user_id,
+                                                 active_challenge_id=self.active_challenge_id).pack())
+        reject_button = InlineKeyboardButton(text=emojize(':cross_mark:'),
+                                             callback_data=RejectParticipantCB(
+                                                 user_id=self.user_id,
+                                                 active_challenge_id=self.active_challenge_id).pack())
+        ban_button = InlineKeyboardButton(text="Заблокировать пользователя",
+                                          callback_data=BanParticipantFromJoiningCB(
+                                              receiver=self.user_id
+                                          ).pack())
+        self.builder.row(accept_button, reject_button, width=2)
+        self.builder.row(ban_button, width=1)
+        return self.builder.as_markup()
+
+
+class GetBackKeyboard(InlineTypeKeyboard):
+
+    def markup(self, *args) -> InlineKeyboardMarkup:
+        btn = InlineKeyboardButton(text=strings.back_to_main_menu, callback_data=ExitChallengeSettingCB().pack())
         self.builder.add(btn)
         return self.builder.as_markup()
 

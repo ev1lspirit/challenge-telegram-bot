@@ -10,6 +10,8 @@ __all__ = "DBInteractor"
 
 logging.basicConfig(level=logging.INFO)
 
+logger = logging.getLogger(__name__)
+
 
 def make_async(function):
     @wraps(function)
@@ -27,9 +29,9 @@ class SingletonDBInteractor:
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            logging.info(f"{cls.__class__.__name__} is created")
+            logger.info(f"{cls.__class__.__name__} is created")
         else:
-            logging.info(f"{cls.__class__.__name__} is returned")
+            logger.info(f"{cls.__class__.__name__} is returned")
         return cls._instance
 
 
@@ -59,7 +61,7 @@ class BaseConnectionState:
         raise NotImplementedError
 
     @make_async
-    def execute(self, query: str, autocommit=False, returning=False):
+    def execute(self, query: str, autocommit=True, returning=False):
         raise NotImplementedError
 
     def __enter__(self):
@@ -110,24 +112,25 @@ class OpenConnectionState(BaseConnectionState):
     def select(self, query: str):
         self.cur.execute(query)
         result = self.cur.fetchall()
-        logging.info(f"Query result: {result}")
+        self.logger.info(f"Query result: {result}")
         return result
 
     @make_async
     def execute(self, query: str, autocommit=False, returning=False):
         self.cur.execute(query)
+        self.logger.info(f"{query} executed.")
         ret = None
         if returning:
             ret = self.cur.fetchall()
         if autocommit:
             self.conn.commit()
+            self.logger.info(f"{query} commited.")
         return ret
 
 
 ChallengeDB = partial(BaseConnectionState, db_user=getenv("DB_USER"),
                              db_name=getenv("DB_NAME"),
                              db_password=getenv("DB_PASSWORD"))
-
 
 
 class DBInteractor(SingletonDBInteractor):

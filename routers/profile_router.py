@@ -5,22 +5,20 @@ from pprint import pprint
 import aiogram.types
 from aiogram.types import Message
 from aiogram import Router, F
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import Command
 from aiogram.utils.formatting import Text
-from middlewares import RequireRegistrationMiddleware
 import queries
 from bot_types import UserChallenge
-from callback_data import ShowMyChallengesCB, LoadNextUserChallengePageCB, LoadPreviousUserChallengePageCB
+from callback_data import LoadNextUserChallengePageCB, LoadPreviousUserChallengePageCB
 from db import select_query, ChallengeDB
-from filters import RequireRegistration, PrivateMessagesScope
+from filters import PrivateMessageScope
 from keyboard_styles.keyboards import UserChallengesPaginationKeyboard
 from strings import ShowProfileInfoPhrases, ChallengeListTemplates, DatetimeEndings, MainMenuButtonNames
 from utils import get_timedelta
 
 
 router = Router(name='ProfileRouter')
-router.message.middleware(RequireRegistrationMiddleware())
-router.callback_query.filter(PrivateMessagesScope())
+router.callback_query.filter(PrivateMessageScope())
 
 
 @router.message(
@@ -69,7 +67,7 @@ async def load_nex_previous_user_active_challenges_pages_handler(callback: aiogr
 
 @router.message(
     F.text.capitalize() == MainMenuButtonNames.my_challenges,
-    PrivateMessagesScope()
+    PrivateMessageScope()
 )
 async def show_list_of_challenges(message: Message):
     query = queries.select_challenges_query.format(user_id=message.from_user.id, offset=0)
